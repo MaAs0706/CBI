@@ -1,121 +1,133 @@
 package org.crimefile.ui;
 
+import org.crimefile.dao.ReportDAO;
+import org.crimefile.models.Report;
+import org.crimefile.models.User;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.util.ArrayList;
 import java.util.List;
 
 public class UserDashboard extends JFrame {
 
-    private JTable reportTable;
+    private User loggedInUser;
+    private JTable reportsTable;
     private DefaultTableModel tableModel;
-    private JTextField tokenSearchField;
-    private JButton addReportButton;
-    private JButton fetchByTokenButton;
-    private JButton logoutButton;
+    private JButton viewButton;
+    private JButton addButton;
+    private ReportDAO reportDAO;
 
-    public UserDashboard() {
-        setTitle("Crime File System - User Dashboard");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 600);
-        setLocationRelativeTo(null);
-        setResizable(false);
-
-        // Main container
-        JPanel mainPanel = new JPanel(new BorderLayout(15, 15));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-        mainPanel.setBackground(new Color(245, 245, 245));
-
-        // --- Header ---
-        JLabel titleLabel = new JLabel("Welcome, User 👮‍♂️", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        titleLabel.setForeground(new Color(40, 40, 40));
-        mainPanel.add(titleLabel, BorderLayout.NORTH);
-
-        // --- Table Section ---
-        String[] columnNames = {"Token Number", "Title", "Date Submitted"};
-        tableModel = new DefaultTableModel(columnNames, 0);
-        reportTable = new JTable(tableModel);
-        reportTable.setFillsViewportHeight(true);
-        JScrollPane scrollPane = new JScrollPane(reportTable);
-
-        // Load dummy reports
+    public UserDashboard(User user) {
+        this.loggedInUser = user;
+        this.reportDAO = new ReportDAO();
+        initUI();
         loadReports();
-
-        mainPanel.add(scrollPane, BorderLayout.CENTER);
-
-        // --- Bottom Controls ---
-        JPanel bottomPanel = new JPanel(new GridBagLayout());
-        bottomPanel.setBackground(new Color(245, 245, 245));
-
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 10, 5, 10);
-
-        tokenSearchField = new JTextField(15);
-        tokenSearchField.setToolTipText("Enter token number");
-        fetchByTokenButton = new JButton("Fetch by Token");
-        addReportButton = new JButton("Add New Report");
-        logoutButton = new JButton("Logout");
-
-        gbc.gridx = 0;
-        bottomPanel.add(tokenSearchField, gbc);
-
-        gbc.gridx = 1;
-        bottomPanel.add(fetchByTokenButton, gbc);
-
-        gbc.gridx = 2;
-        bottomPanel.add(addReportButton, gbc);
-
-        gbc.gridx = 3;
-        bottomPanel.add(logoutButton, gbc);
-
-        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
-
-        add(mainPanel);
-
-        // --- Button Actions ---
-        fetchByTokenButton.addActionListener(this::handleFetchByToken);
-        addReportButton.addActionListener(this::handleAddReport);
-        logoutButton.addActionListener(e -> handleLogout());
     }
 
-    // Temporary mock data for now
-    private void loadReports() {
-        List<String[]> mockReports = new ArrayList<>();
-        mockReports.add(new String[]{"CRF-1728312034159", "Robbery in Market Street", "2025-10-03"});
-        mockReports.add(new String[]{"CRF-1728312037120", "Missing Vehicle", "2025-10-04"});
+    private void initUI() {
+        setTitle("User Dashboard - " + loggedInUser.getUsername());
+        setSize(800, 500);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        for (String[] row : mockReports) {
-            tableModel.addRow(row);
+        // --- Top panel with welcome message ---
+        JPanel topPanel = new JPanel(new BorderLayout());
+        JLabel welcomeLabel = new JLabel("Welcome, " + loggedInUser.getUsername());
+        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        topPanel.add(welcomeLabel, BorderLayout.WEST);
+        add(topPanel, BorderLayout.NORTH);
+
+        // --- Table of reports ---
+        String[] columns = {"Token", "Title", "Status", "Created At"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // make table read-only
+            }
+        };
+        reportsTable = new JTable(tableModel);
+        JScrollPane scrollPane = new JScrollPane(reportsTable);
+        add(scrollPane, BorderLayout.CENTER);
+
+        // --- Bottom panel with buttons ---
+        JPanel bottomPanel = new JPanel();
+
+        viewButton = new JButton("View Report Details");
+        viewButton.addActionListener(e -> viewReportDetails());
+        bottomPanel.add(viewButton);
+
+        addButton = new JButton("Add New Report");
+        addButton.addActionListener(e -> addNewReport());
+        bottomPanel.add(addButton);
+
+        add(bottomPanel, BorderLayout.SOUTH);
+    }
+
+    // --- Load user's reports into table ---
+    private void loadReports() {
+        tableModel.setRowCount(0); // clear previous rows
+        List<Report> reports = reportDAO.getReportsByUser(loggedInUser.getId());
+        for (Report r : reports) {
+            tableModel.addRow(new Object[]{
+                    r.getToken(),
+                    r.getTitle(),
+                    r.getStatus(),
+                    r.getCreatedAt()
+            });
         }
     }
 
-    private void handleFetchByToken(ActionEvent e) {
-        String token = tokenSearchField.getText().trim();
-        if (token.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter a token number.", "Warning", JOptionPane.WARNING_MESSAGE);
+    // --- View report full details by token ---
+    private void viewReportDetails() {
+        int selectedRow = reportsTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a report", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        // Open detail page (mock)
-        new ReportDetailsPage(token).setVisible(true);
-    }
-
-    private void handleAddReport(ActionEvent e) {
-        new AddReportPage().setVisible(true);
-    }
-
-    private void handleLogout() {
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to logout?", "Confirm", JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            new LoginPage().setVisible(true);
-            dispose();
+        String token = (String) tableModel.getValueAt(selectedRow, 0);
+        Report report = reportDAO.getReportByToken(token);
+        if (report != null) {
+            JOptionPane.showMessageDialog(this,
+                    "Token: " + report.getToken() + "\n" +
+                            "Title: " + report.getTitle() + "\n" +
+                            "Description: " + report.getDescription() + "\n" +
+                            "Status: " + report.getStatus() + "\n" +
+                            "Created At: " + report.getCreatedAt(),
+                    "Report Details",
+                    JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this, "Report not found", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new UserDashboard().setVisible(true));
+    // --- Add a new report ---
+    private void addNewReport() {
+        JTextField titleField = new JTextField();
+        JTextArea descArea = new JTextArea(5, 20);
+        JScrollPane scroll = new JScrollPane(descArea);
+
+        Object[] message = {
+                "Title:", titleField,
+                "Description:", scroll
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, message, "Add New Report", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            String title = titleField.getText().trim();
+            String description = descArea.getText().trim();
+            if (!title.isEmpty() && !description.isEmpty()) {
+                Report report = reportDAO.addReport(loggedInUser.getId(), title, description);
+                if (report != null) {
+                    loadReports();
+                    JOptionPane.showMessageDialog(this, "Report added successfully!\nToken: " + report.getToken());
+                } else {
+                    JOptionPane.showMessageDialog(this, "Failed to add report", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Title and Description cannot be empty", "Input Error", JOptionPane.WARNING_MESSAGE);
+            }
+        }
     }
 }

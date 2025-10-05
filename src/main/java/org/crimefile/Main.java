@@ -2,7 +2,8 @@ package org.crimefile;
 
 import com.formdev.flatlaf.FlatDarkLaf;
 import javax.swing.UIManager;
-import org.crimefile.ui.LoginPage;
+import org.crimefile.ui.HomePage;
+import org.crimefile.db.DatabaseSetup;
 
 public class Main {
     public static void main(String[] args) {
@@ -13,7 +14,10 @@ public class Main {
             e.printStackTrace();
         }
 
-        // Launch the login page
-        new LoginPage().setVisible(true);
+        // Initialize database (create tables if not exists)
+        DatabaseSetup.initialize();
+
+        // Launch the homepage
+        new HomePage().setVisible(true);
     }
 }
